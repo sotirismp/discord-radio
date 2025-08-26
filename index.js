@@ -1,117 +1,116 @@
-import { ActivityType, Client, GatewayIntentBits } from "discord.js";
+import { Client, GatewayIntentBits, ActivityType } from "discord.js";
+import { REST } from "@discordjs/rest";
+import { Routes } from "discord-api-types/v9";
 import dotenv from "dotenv";
 import { joinAndPlay } from "./joinAndPlay.js";
+import { commands, FMs } from "./commands.js"; // New
+
 dotenv.config();
 
-const connections = new Map(); // guildId => { connection, player, channelId }
 const TOKEN = process.env.TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID;
 
-const FMs = {
-  "!sok": {
-    url: "https://n0d.radiojar.com/zeqcyyvu48hvv?rj-ttl=5&rj-tok=AAABmOWrowwAeCPyrZw7_C750g",
-    message: "Χαλκίδα SOK FM 104.8",
-  },
-  "!dpg": { url: "https://stream.7000fm.gr/radio/8000/radio.mp3", message: "DPG 7000 FM" },
-  "!athens": { url: "https://netradio.live24.gr/athensdeejay", message: "Athens Radio DJ" },
-  "!music": {
-    url: "https://netradio.live24.gr/music892",
-    message: "Music 89.2",
-  },
-  "!pepper": {
-    url: "https://netradio.live24.gr/pepper9660?1756205793",
-    message: "Pepper FM 96.6",
-  },
-  "!galaxy": {
-    url: "https://galaxy.live24.gr/galaxy9292",
-    message: "Galaxy FM 92",
-  },
-  "!kiss": {
-    url: "https://antares.dribbcast.com/proxy/kiss961?mp=/stream",
-    message: "Kiss FM 96.1",
-  },
-  "!best": {
-    url: "https://best.live24.gr/best1222",
-    message: "Best FM 92.6",
-  },
-};
+const connections = new Map();
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
 });
 
-client.once("clientReady", () => {
+// When bot joins a new server
+client.on("guildCreate", async (guild) => {
+  const rest = new REST({ version: "9" }).setToken(TOKEN);
+
+  try {
+    console.log(`Registering commands for guild ${guild.name} (${guild.id})`);
+
+    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, guild.id), { body: commands });
+
+    console.log(`Successfully registered commands in ${guild.name}`);
+  } catch (error) {
+    console.error(`Failed to register commands in ${guild.name}`, error);
+  }
+});
+
+client.once("clientReady", async () => {
   console.log(`Logged in as ${client.user.tag}`);
   console.log(
-    `Invite the bot at: https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=3145728&integration_type=0&scope=bot`
+    `Invite: https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=3145728&scope=bot%20applications.commands`
   );
+  const rest = new REST({ version: "9" }).setToken(TOKEN);
+
+  for (const guild of client.guilds.cache.values()) {
+    try {
+      await rest.put(Routes.applicationGuildCommands(CLIENT_ID, guild.id), { body: commands });
+      console.log(`✅ Synced slash commands for guild: ${guild.name} (${guild.id})`);
+    } catch (error) {
+      console.error(`❌ Failed to sync commands for ${guild.name} (${guild.id})`, error);
+    }
+  }
 });
 
 client.on("voiceStateUpdate", (oldState, newState) => {
   const guildId = oldState.guild.id;
   const connInfo = connections.get(guildId);
   if (!connInfo) return;
-
   const { connection, player } = connInfo;
-
   const botChannelId = connection.joinConfig.channelId;
   if (oldState.channelId !== botChannelId && newState.channelId !== botChannelId) return;
-
   const channel = oldState.guild.channels.cache.get(botChannelId);
   if (!channel || channel.type !== 2) return; // 2 = voice channel
-
   const nonBotMembers = channel.members.filter((member) => !member.user.bot);
   if (nonBotMembers.size === 0) {
     console.log("All users left. Disconnecting bot.");
-
     if (player) player.stop();
     connection.destroy();
     connections.delete(guildId);
   }
 });
 
-client.on("messageCreate", async (message) => {
-  const { content } = message;
-  if (Object.keys(FMs).includes(content)) {
-    const voiceChannel = message.member.voice.channel;
-    if (!voiceChannel) return message.reply("Join a voice channel first!");
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isCommand()) return;
 
-    const permissions = voiceChannel.permissionsFor(message.client.user);
-    if (!permissions || !permissions.has("ViewChannel")) {
-      return message.reply("I can't see that voice channel.");
-    }
-    if (!permissions.has("Connect")) {
-      return message.reply("I don't have permission to join that voice channel.");
-    }
-    if (!permissions.has("Speak")) {
-      return message.reply("I don't have permission to speak in that voice channel.");
+  const { commandName } = interaction;
+
+  if (commandName === "play") {
+    const station = interaction.options.getString("station");
+    const voiceChannel = interaction.member.voice.channel;
+
+    if (!voiceChannel) {
+      return interaction.reply("You need to join a voice channel first!");
     }
 
-    const streamUrl = FMs[content].url;
-    await joinAndPlay(voiceChannel, streamUrl, connections, message.guild.id);
-    message.reply(`Playing ${FMs[content].message}`);
+    const permissions = voiceChannel.permissionsFor(interaction.client.user);
+    if (!permissions?.has("Connect") || !permissions.has("Speak")) {
+      return interaction.reply("I need permissions to join and speak in your voice channel!");
+    }
+
+    const streamUrl = FMs[station]?.url;
+    if (!streamUrl) {
+      return interaction.reply("Invalid station.");
+    }
+
+    await joinAndPlay(voiceChannel, streamUrl, connections, interaction.guild.id);
+
+    interaction.reply(`Now playing ${FMs[station].message}`);
     client.user.setPresence({
-      activities: [
-        {
-          name: FMs[content].message,
-          type: ActivityType.Listening, // Can be PLAYING, STREAMING, LISTENING, WATCHING, etc.
-        },
-      ],
+      activities: [{ name: FMs[station].message, type: ActivityType.Listening }],
     });
   }
-  if (message.content === "!stop") {
-    const connInfo = connections.get(message.guild.id);
+
+  if (commandName === "stop") {
+    const connInfo = connections.get(interaction.guild.id);
     if (connInfo) {
       connInfo.player.stop();
       connInfo.connection.destroy();
-      connections.delete(message.guild.id);
-      message.channel.send("Stopped streaming and disconnected!");
+      connections.delete(interaction.guild.id);
+      interaction.reply("Stopped streaming and disconnected!");
     } else {
-      message.channel.send("Not currently connected.");
+      interaction.reply("I'm not connected to any voice channel.");
     }
   }
 });
