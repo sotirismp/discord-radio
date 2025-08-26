@@ -6,10 +6,7 @@ import { joinAndPlay } from "./joinAndPlay.js";
 import { commands, FMs } from "./commands.js"; // New
 
 dotenv.config();
-
 const TOKEN = process.env.TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID;
-
 const connections = new Map();
 
 const client = new Client({
@@ -21,21 +18,6 @@ const client = new Client({
   ],
 });
 
-// When bot joins a new server
-client.on("guildCreate", async (guild) => {
-  const rest = new REST({ version: "9" }).setToken(TOKEN);
-
-  try {
-    console.log(`Registering commands for guild ${guild.name} (${guild.id})`);
-
-    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, guild.id), { body: commands });
-
-    console.log(`Successfully registered commands in ${guild.name}`);
-  } catch (error) {
-    console.error(`Failed to register commands in ${guild.name}`, error);
-  }
-});
-
 client.once("clientReady", async () => {
   console.log(`Logged in as ${client.user.tag}`);
   console.log(
@@ -45,11 +27,26 @@ client.once("clientReady", async () => {
 
   for (const guild of client.guilds.cache.values()) {
     try {
-      await rest.put(Routes.applicationGuildCommands(CLIENT_ID, guild.id), { body: commands });
+      await rest.put(Routes.applicationGuildCommands(client.user.id, guild.id), { body: commands });
       console.log(`✅ Synced slash commands for guild: ${guild.name} (${guild.id})`);
     } catch (error) {
       console.error(`❌ Failed to sync commands for ${guild.name} (${guild.id})`, error);
     }
+  }
+});
+
+// When bot joins a new server
+client.on("guildCreate", async (guild) => {
+  const rest = new REST({ version: "9" }).setToken(TOKEN);
+
+  try {
+    console.log(`Registering commands for guild ${guild.name} (${guild.id})`);
+
+    await rest.put(Routes.applicationGuildCommands(client.user.id, guild.id), { body: commands });
+
+    console.log(`Successfully registered commands in ${guild.name}`);
+  } catch (error) {
+    console.error(`Failed to register commands in ${guild.name}`, error);
   }
 });
 
