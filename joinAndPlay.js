@@ -1,6 +1,23 @@
-import { createAudioPlayer, joinVoiceChannel, createAudioResource, AudioPlayerStatus } from "@discordjs/voice";
-import { spawn } from "child_process";
-import ffmpeg from "ffmpeg-static";
+import { createAudioPlayer, createAudioResource, joinVoiceChannel } from "@discordjs/voice";
+import { spawn, execSync } from "child_process";
+import ffmpegStatic from "ffmpeg-static";
+import { existsSync } from "fs";
+
+function getFfmpegPath() {
+  try {
+    // Try to get the path of system ffmpeg, throws if not found
+    execSync("ffmpeg -version", { stdio: "ignore" });
+    return "ffmpeg"; // system ffmpeg available, use it
+  } catch {
+    // fallback to ffmpeg-static binary
+    if (ffmpegStatic && existsSync(ffmpegStatic)) {
+      return ffmpegStatic;
+    }
+    throw new Error("ffmpeg not found: install system ffmpeg or add ffmpeg-static dependency.");
+  }
+}
+
+const ffmpegPath = getFfmpegPath();
 
 export async function joinAndPlay(channel, url, connections, guildId) {
   let connectionInfo = connections.get(guildId);
@@ -28,7 +45,7 @@ export async function joinAndPlay(channel, url, connections, guildId) {
     connectionInfo = { connection, player, channelId: channel.id };
   }
 
-  const ffmpegProcess = spawn(ffmpeg, [
+  const ffmpegProcess = spawn(ffmpegPath, [
     "-i",
     url,
     "-af",
