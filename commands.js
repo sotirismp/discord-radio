@@ -10,7 +10,7 @@ export const FMs = {
   athens: { url: "https://netradio.live24.gr/athensdeejay", message: "Athens Radio DJ 95.2" },
   music: { url: "https://netradio.live24.gr/music892", message: "Music 89.2" },
   pepper: { url: "https://netradio.live24.gr/pepper9660?1756205793", message: "Pepper 96.6" },
-  galaxy: { url: "https://galaxy.live24.gr/galaxy9292", message: "Galaxy 92" },
+  galaxy: { url: "https://galaxy.live24.gr/galaxy9292", message: "Galaxy 92.0" },
   kiss: { url: "https://antares.dribbcast.com/proxy/kiss961?mp=/stream", message: "Kiss 96.1" },
   red: {
     url: "https://n36a-eu.rcs.revma.com/e4d84zez1duvv?rj-ttl=5&rj-tok=AAABmOfGhRMA3piuBRvfsIIF6A",
