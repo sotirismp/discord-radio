@@ -61,6 +61,9 @@ client.on("voiceStateUpdate", (oldState, newState) => {
   if (!channel || channel.type !== 2) return; // 2 = voice channel
   const nonBotMembers = channel.members.filter((member) => !member.user.bot);
   if (nonBotMembers.size === 0) {
+    if (connInfo.ffmpegProcess) {
+      connInfo.ffmpegProcess.kill("SIGKILL"); // Ensure the process is killed
+    }
     console.log("All users left. Disconnecting bot.");
     if (player) player.stop();
     connection.destroy();
@@ -102,6 +105,9 @@ client.on("interactionCreate", async (interaction) => {
   if (commandName === "stop") {
     const connInfo = connections.get(interaction.guild.id);
     if (connInfo) {
+      if (connInfo.ffmpegProcess) {
+        connInfo.ffmpegProcess.kill("SIGKILL"); // Ensure the process is killed
+      }
       connInfo.player.stop();
       connInfo.connection.destroy();
       connections.delete(interaction.guild.id);
