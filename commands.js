@@ -25,6 +25,10 @@ export const FMs = {
     url: "https://n43a-eu.rcs.revma.com/10q3enqxbfhvv?rj-ttl=5&rj-tok=AAABmOcrfkMA3tmu1YiuTtbF9g",
     message: "Dromos 89.8",
   },
+  sfaira: {
+    url: "https://sfera.live24.gr/sfera4132",
+    message: "Sfera 102.2",
+  },
 };
 
 export const commands = [
@@ -40,8 +44,8 @@ export const commands = [
           ...Object.entries(FMs).map(([key, value]) => ({
             value: key,
             name: value.message,
-          }))
-        )
+          })),
+        ),
     ),
   new SlashCommandBuilder().setName("stop").setDescription("Stop the radio stream and disconnect the bot"),
 ].map((command) => command.toJSON());
